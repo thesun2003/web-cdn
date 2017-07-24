@@ -32655,19 +32655,38 @@ var opts = {
 };
 var client = new WebTorrent(opts);
 
+client.on('update', function (data) {
+  console.log('got an announce response from tracker: ' + data.announce)
+  console.log('number of seeders in the swarm: ' + data.complete)
+  console.log('number of leechers in the swarm: ' + data.incomplete)
+})
+
+client.on('scrape', function (data) {
+  console.log('got a scrape response from tracker: ' + data.announce)
+  console.log('number of seeders in the swarm: ' + data.complete)
+  console.log('number of leechers in the swarm: ' + data.incomplete)
+  console.log('number of total downloads of this torrent: ' + data.downloaded)
+})
+
 var announceList = [
   // [ 'http://localhost:8000/announce'],
   // [ 'udp://0.0.0.0:8000'],
   // [ 'udp://localhost:8000'],
   // [ 'ws://localhost:8000'],
+  
+  [ 'udp://explodie.org:6969' ],
+  [ 'udp://tracker.coppersurfer.tk:6969' ],
+  [ 'udp://tracker.empire-js.us:1337' ],
+  [ 'udp://tracker.leechers-paradise.org:6969' ],
+  [ 'udp://tracker.opentrackr.org:1337' ],
+
   [ 'udp://tracker.openbittorrent.com:80' ],
   [ 'udp://tracker.internetwarriors.net:1337' ],
-  [ 'udp://tracker.leechers-paradise.org:6969' ],
-  [ 'udp://tracker.coppersurfer.tk:6969' ],
   [ 'udp://exodus.desync.com:6969' ],
+
   [ 'wss://tracker.btorrent.xyz' ],
-  [ 'wss://tracker.openwebtorrent.com' ],
   [ 'wss://tracker.fastcast.nz'],
+  [ 'wss://tracker.openwebtorrent.com' ],
 ]
 var seeding_list = {};
 
@@ -32676,6 +32695,7 @@ function get_magnet_uri(full_url, url_hash) {
 	for (var i=0; i < announceList.length; i++) {
 		magnet += '&tr=' + encodeURIComponent(announceList[i][0]);
 	}
+	magnet += '&ws=' + encodeURIComponent(full_url);
 	return magnet;
 }
 
@@ -32691,9 +32711,8 @@ function prettyBytes(num) {
 }
 
 function show_progress(percent, url_hash) {
-	var size = percent.toString()+'% 5px';
-	// console.log(size);
-	$('*[hash="'+url_hash+'"]').css('background-size', size);
+	var gradient = 'linear-gradient(to right, #35b44f ' + percent.toString() + '%, transparent 0%, transparent)';
+	$('*[hash="'+url_hash+'"]').css('background-image', gradient)
 }
 
 // Statistics
@@ -32704,7 +32723,7 @@ function onProgress(torrent) {
 	console.log(torrent.numPeers + (torrent.numPeers === 1 ? ' peer' : ' peers'));
 
 	// Progress
-	var percent = Math.round(torrent.progress * 100 * 100) / 100
+	var percent = Math.round(torrent.progress * 100)
 	console.log(percent + '%', prettyBytes(torrent.downloaded), prettyBytes(torrent.length))
 
 	show_progress(percent, torrent.discovery.infoHash);
@@ -32727,7 +32746,7 @@ function onProgress(torrent) {
 function render_file(torrent) {
 	console.log('Rendering');
 	torrent.files.forEach(function (file) {
-		console.log('Render file: ', file);
+		// console.log('Render file: ', file);
 		// console.log(torrent.discovery.infoHash)
 
     	// file.getBlob(function callback (err, blob) {
@@ -32745,11 +32764,8 @@ function render_file(torrent) {
      	//   // console.log('message', "Got cached version of "+got_page.url+" from web peer, checking security hash.")
     	// });
 
-
-  		file.renderTo('*[hash="'+torrent.discovery.infoHash+'"]', function (err, elem) {
+		file.renderTo('*[hash="'+torrent.discovery.infoHash+'"]', function (err, elem) {
 		    if (err) throw err // file failed to download or display in the DOM
-		    // console.log('Existing DOM node with the content', elem)
-			// torrent.destroy();
 		});
 
     });
@@ -32762,10 +32778,11 @@ function onTorrentDownloading(torrent) {
     render_file(torrent);
 
     torrent.on('done', function (info) {
-      console.log('webtorrent', 'Cache received')
+      console.log('webtorrent', 'File received')
     })
     torrent.on('download', function (bytes) {
-      console.log('webtorrent', 'Receiving Cache ('+bytes+' bytes)')
+      onProgress(torrent);
+      console.log('webtorrent', 'Receiving file ('+bytes+' bytes)')
     })
     torrent.on('wire', function (wire) {
       console.log('webtorrent', 'Peer ('+wire.remoteAddress+') connected over '+wire.type+' (Connection ID: '+wire.peerId.substr(0,10)+').')
@@ -32787,7 +32804,8 @@ function find_seeds(full_url) {
 	    var torrent = client.add(magnet, onTorrentDownloading);
 
 		torrent.on('noPeers', function (announceType) {
-			console.log('no peers found');
+			console.log('no peers found', announceType);
+
 			const parsed = queryString.parse(location.search);
 
 			if (typeof parsed['seed'] != "undefined") {
