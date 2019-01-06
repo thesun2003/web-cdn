@@ -1,8 +1,8 @@
-var WebTorrent = require('webtorrent')
-var queryString = require('query-string')
-var sha = require('simple-sha1')
-var Buffer = require('safe-buffer').Buffer
-var $ = require('jquery')
+var WebTorrent = require('webtorrent');
+var queryString = require('query-string');
+var sha = require('simple-sha1');
+var Buffer = require('safe-buffer').Buffer;
+var $ = require('jquery');
 
 var opts = {
   maxConns: 5,        // Max number of connections per torrent (default=55)
@@ -16,14 +16,14 @@ client.on('update', function (data) {
   console.log('got an announce response from tracker: ' + data.announce)
   console.log('number of seeders in the swarm: ' + data.complete)
   console.log('number of leechers in the swarm: ' + data.incomplete)
-})
+});
 
 client.on('scrape', function (data) {
   console.log('got a scrape response from tracker: ' + data.announce)
   console.log('number of seeders in the swarm: ' + data.complete)
   console.log('number of leechers in the swarm: ' + data.incomplete)
   console.log('number of total downloads of this torrent: ' + data.downloaded)
-})
+});
 
 var announceList = [
   // [ 'http://localhost:8000/announce'],
@@ -44,7 +44,7 @@ var announceList = [
   [ 'wss://tracker.btorrent.xyz' ],
   [ 'wss://tracker.fastcast.nz'],
   [ 'wss://tracker.openwebtorrent.com' ],
-]
+];
 var seeding_list = {};
 
 function get_magnet_uri(full_url, url_hash) {
@@ -58,12 +58,12 @@ function get_magnet_uri(full_url, url_hash) {
 
 // Human readable bytes util
 function prettyBytes(num) {
-	var exponent, unit, neg = num < 0, units = ['B', 'kB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']
-	if (neg) num = -num
-	if (num < 1) return (neg ? '-' : '') + num + ' B'
-	exponent = Math.min(Math.floor(Math.log(num) / Math.log(1000)), units.length - 1)
-	num = Number((num / Math.pow(1000, exponent)).toFixed(2))
-	unit = units[exponent]
+	var exponent, unit, neg = num < 0, units = ['B', 'kB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+	if (neg) num = -num;
+	if (num < 1) return (neg ? '-' : '') + num + ' B';
+	exponent = Math.min(Math.floor(Math.log(num) / Math.log(1000)), units.length - 1);
+	num = Number((num / Math.pow(1000, exponent)).toFixed(2));
+	unit = units[exponent];
 	return (neg ? '-' : '') + num + ' ' + unit
 }
 
@@ -80,8 +80,8 @@ function onProgress(torrent) {
 	console.log(torrent.numPeers + (torrent.numPeers === 1 ? ' peer' : ' peers'));
 
 	// Progress
-	var percent = Math.round(torrent.progress * 100)
-	console.log(percent + '%', prettyBytes(torrent.downloaded), prettyBytes(torrent.length))
+	var percent = Math.round(torrent.progress * 100);
+	console.log(percent + '%', prettyBytes(torrent.downloaded), prettyBytes(torrent.length));
 
 	show_progress(percent, torrent.discovery.infoHash);
 
@@ -181,12 +181,12 @@ function seeding(data, full_url) {
 		    // var payload = data;
 		    // var buffer_payload = Buffer.from(JSON.stringify(payload), 'utf8')
 
-		    var buffer_payload = Buffer.from(data, 'binary')
-		    
-		    console.log('ready')
+		    var buffer_payload = Buffer.from(data, 'binary');
 
-		    var torrent = client.seed(buffer_payload, {forced_id: url_hash, announceList: announceList, name: full_url}, function(torrent){
-		        console.log('Sending', torrent.magnetURI)
+		    console.log('ready');
+
+		    var torrent = client.seed(buffer_payload, {forced_id: url_hash, announceList: announceList, name: full_url}, function(torrent) {
+		        console.log('Sending', torrent.magnetURI);
 
 				render_file(torrent);
 

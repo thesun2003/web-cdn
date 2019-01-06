@@ -1,12 +1,12 @@
 {
-  "name": "web_cdn",
+  "name": "web-cdn",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "src/index.js",
   "scripts": {
-    "start": "node index.js",
-    "build": "browserify -s web_cdn -e ./ | uglifyjs -c warnings=false -m > web-cdn.min.js",
-    "build-debug": "browserify -s web_cdn -e ./> web-cdn.debug.js",
+    "start": "serve -s public",
+    "build": "browserify -s web-cdn -e ./ | uglifyjs -c warnings=false -m > public/web-cdn.min.js",
+    "build-debug": "browserify -s web-cdn -e ./> public/web-cdn.debug.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "engines": {
@@ -26,6 +26,7 @@
     "package-json-versionify": "^1.0.4",
     "query-string": "^4.3.4",
     "uglify-es": "^3.0.25",
+    "serve": "^10.1.1",
     "webtorrent": "git+https://github.com/guerrerocarlos/webtorrent.git#cachep2p"
   }
 }
