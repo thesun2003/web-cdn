@@ -2862,7 +2862,7 @@ function Peer (opts) {
 
   self.initiator = opts.initiator || false
   self.channelConfig = opts.channelConfig || Peer.channelConfig
-  self.config = opts.config || Peer.config
+  self.config = Object.assign({}, Peer.config, opts.config)
   self.constraints = self._transformConstraints(opts.constraints || Peer.constraints)
   self.offerConstraints = self._transformConstraints(opts.offerConstraints || {})
   self.answerConstraints = self._transformConstraints(opts.answerConstraints || {})
@@ -2904,7 +2904,7 @@ function Peer (opts) {
   self._batchedNegotiation = false // batch synchronous negotiations
   self._queuedNegotiation = false // is there a queued negotiation request?
   self._sendersAwaitingStable = []
-  self._senderMap = new WeakMap()
+  self._senderMap = new Map()
   self._firstStable = true
   self._closingInterval = null
 
@@ -3090,7 +3090,7 @@ Peer.prototype.addTrack = function (track, stream) {
   self._debug('addTrack()')
 
   var sender = self._pc.addTrack(track, stream)
-  var submap = self._senderMap.get(track) || new WeakMap() // nested WeakMaps map [track, stream] to sender
+  var submap = self._senderMap.get(track) || new Map() // nested Maps map [track, stream] to sender
   submap.set(stream, sender)
   self._senderMap.set(track, submap)
   self._needsNegotiation()
@@ -38469,32 +38469,19 @@ module.exports = function zeroFill (width, number, pad) {
 }
 
 },{}],206:[function(require,module,exports){
-var WebTorrent = require('webtorrent')
-var queryString = require('query-string')
-var sha = require('simple-sha1')
-var Buffer = require('safe-buffer').Buffer
-var $ = require('jquery')
+let WebTorrent = require('webtorrent');
+let queryString = require('query-string');
+let sha = require('simple-sha1');
+let Buffer = require('safe-buffer').Buffer;
+let $ = require('jquery');
 
-var opts = {
-  maxConns: 5,        // Max number of connections per torrent (default=55)
-  tracker: true, // Enable trackers (default=true), or options object for Tracker
-  dht: true,     // Enable DHT (default=true), or options object for DHT
-  webSeeds: true        // Enable BEP19 web seeds (default=true)
+let opts = {
+  maxConns: 5,    // Max number of connections per torrent (default=55)
+  tracker: true,  // Enable trackers (default=true), or options object for Tracker
+  dht: true,      // Enable DHT (default=true), or options object for DHT
+  webSeeds: true, // Enable BEP19 web seeds (default=true)
 };
-var client = new WebTorrent(opts);
-
-client.on('update', function (data) {
-  console.log('got an announce response from tracker: ' + data.announce)
-  console.log('number of seeders in the swarm: ' + data.complete)
-  console.log('number of leechers in the swarm: ' + data.incomplete)
-})
-
-client.on('scrape', function (data) {
-  console.log('got a scrape response from tracker: ' + data.announce)
-  console.log('number of seeders in the swarm: ' + data.complete)
-  console.log('number of leechers in the swarm: ' + data.incomplete)
-  console.log('number of total downloads of this torrent: ' + data.downloaded)
-})
+let client = new WebTorrent(opts);
 
 var announceList = [
   // [ 'http://localhost:8000/announce'],
@@ -38512,34 +38499,73 @@ var announceList = [
   [ 'udp://tracker.internetwarriors.net:1337' ],
   [ 'udp://exodus.desync.com:6969' ],
 
-  [ 'wss://tracker.btorrent.xyz' ],
+  // [ 'wss://tracker.btorrent.xyz' ],
   [ 'wss://tracker.fastcast.nz'],
   [ 'wss://tracker.openwebtorrent.com' ],
-]
-var seeding_list = {};
+];
+let fileInfo = {};
 
-function get_magnet_uri(full_url, url_hash) {
-	var magnet = 'magnet:?xt=urn:btih:' + url_hash + '&dn=' + encodeURIComponent(full_url);
-	for (var i=0; i < announceList.length; i++) {
+function getMagnetUri(full_url, url_hash) {
+	let magnet = 'magnet:?xt=urn:btih:' + url_hash + '&dn=' + encodeURIComponent(full_url);
+	for (let i=0; i < announceList.length; i++) {
 		magnet += '&tr=' + encodeURIComponent(announceList[i][0]);
 	}
 	magnet += '&ws=' + encodeURIComponent(full_url);
+    magnet += '&as=' + encodeURIComponent(full_url);
 	return magnet;
+}
+
+function getFullUrl(url) {
+    return location.protocol + '//' + location.host + url;
+}
+
+function setFileInfoField(fullUrl, field, value) {
+    if (!getFileState(fullUrl)) {
+        fileInfo[fullUrl] = {
+            'state': null,
+            'rendered': null,
+        };
+    }
+    fileInfo[fullUrl][field] = value;
+}
+
+function setFileState(fullUrl, state) {
+    setFileInfoField(fullUrl, 'state', state);
+
+    if (state === 'rendered') {
+        setFileInfoField(fullUrl, 'rendered', true);
+    }
+}
+
+function getFileInfoField(fullUrl, field) {
+    if (fullUrl in fileInfo) {
+        return fileInfo[fullUrl][field];
+    }
+
+    return null;
+}
+
+function getFileState(fullUrl) {
+    return getFileInfoField(fullUrl, 'state');
+}
+
+function isFileRendered(fullUrl) {
+    return getFileInfoField(fullUrl, 'rendered');
 }
 
 // Human readable bytes util
 function prettyBytes(num) {
-	var exponent, unit, neg = num < 0, units = ['B', 'kB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']
-	if (neg) num = -num
-	if (num < 1) return (neg ? '-' : '') + num + ' B'
-	exponent = Math.min(Math.floor(Math.log(num) / Math.log(1000)), units.length - 1)
-	num = Number((num / Math.pow(1000, exponent)).toFixed(2))
-	unit = units[exponent]
+	let exponent, unit, neg = num < 0, units = ['B', 'kB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+	if (neg) num = -num;
+	if (num < 1) return (neg ? '-' : '') + num + ' B';
+	exponent = Math.min(Math.floor(Math.log(num) / Math.log(1000)), units.length - 1);
+	num = Number((num / Math.pow(1000, exponent)).toFixed(2));
+	unit = units[exponent];
 	return (neg ? '-' : '') + num + ' ' + unit
 }
 
-function show_progress(percent, url_hash) {
-	var gradient = 'linear-gradient(to right, #35b44f ' + percent.toString() + '%, transparent 0%, transparent)';
+function showProgress(percent, url_hash) {
+	let gradient = 'linear-gradient(to right, #35b44f ' + percent.toString() + '%, transparent 0%, transparent)';
 	$('*[hash="'+url_hash+'"]').css('background-image', gradient)
 }
 
@@ -38551,163 +38577,155 @@ function onProgress(torrent) {
 	console.log(torrent.numPeers + (torrent.numPeers === 1 ? ' peer' : ' peers'));
 
 	// Progress
-	var percent = Math.round(torrent.progress * 100)
-	console.log(percent + '%', prettyBytes(torrent.downloaded), prettyBytes(torrent.length))
+	let percent = Math.round(torrent.progress * 100);
+	console.log(percent + '%', prettyBytes(torrent.downloaded), prettyBytes(torrent.length));
 
-	show_progress(percent, torrent.discovery.infoHash);
-
-	// // Remaining time
-	// var remaining
-	// if (torrent.done) {
-	// 	remaining = 'Done.'
-	// } else {
-	//     remaining = moment.duration(torrent.timeRemaining / 1000, 'seconds').humanize()
-	//     remaining = remaining[0].toUpperCase() + remaining.substring(1) + ' remaining.'
-	// }
-	// $remaining.innerHTML = remaining
-
-	// // Speed rates
-	// $downloadSpeed.innerHTML = prettyBytes(torrent.downloadSpeed) + '/s'
-	// $uploadSpeed.innerHTML = prettyBytes(torrent.uploadSpeed) + '/s'
+    if (!torrent.done) {
+        showProgress(percent, torrent.discovery.infoHash);
+    }
 }
 
-function render_file(torrent) {
+function getFile(torrent) {
+	return torrent.files[0];
+}
+
+function renderFile(torrent) {
+	let fullUrl = torrent.name;
+
+    if (isFileRendered(fullUrl)) {
+    	return 0;
+    }
+
 	console.log('Rendering');
-	torrent.files.forEach(function (file) {
-		// console.log('Render file: ', file);
-		// console.log(torrent.discovery.infoHash)
 
-    	// file.getBlob(function callback (err, blob) {
-    	// 	 console.log(blob);
-    	// })
+    setFileState(fullUrl, 'rendered');
 
-    	// file.getBlobURL(function callback (err, url) {
-    	// 	 console.log(url);
-    	// })
-
-     	// file.getBuffer(function (err, buffer) {
-     	// 	 if (err) return log(err.message)
-     	//   // var got_page = JSON.parse(b.toString('utf8'));
-     	//   console.log(buffer);        	
-     	//   // console.log('message', "Got cached version of "+got_page.url+" from web peer, checking security hash.")
-    	// });
-
-		file.renderTo('*[hash="'+torrent.discovery.infoHash+'"]', function (err, elem) {
-		    if (err) throw err // file failed to download or display in the DOM
-		});
-
+	let file = getFile(torrent);
+    file.renderTo('*[hash="'+torrent.discovery.infoHash+'"]', function (err, elem) {
+        if (err) throw err; // file failed to download or display in the DOM
     });
+
 }
 
 function onTorrentDownloading(torrent) {
-	setInterval(function () { onProgress(torrent); }, 500);
-    // console.log(torrent);
-
-    render_file(torrent);
+    renderFile(torrent);
 
     torrent.on('done', function (info) {
-      console.log('webtorrent', 'File received')
-    })
+      	console.log('webtorrent', 'OTD: File received');
+    });
+
     torrent.on('download', function (bytes) {
-      onProgress(torrent);
-      console.log('webtorrent', 'Receiving file ('+bytes+' bytes)')
-    })
-    torrent.on('wire', function (wire) {
-      console.log('webtorrent', 'Peer ('+wire.remoteAddress+') connected over '+wire.type+' (Connection ID: '+wire.peerId.substr(0,10)+').')
-    })
+      	console.log('webtorrent', 'Receiving file ('+bytes+' bytes)');
+        onProgress(torrent);
+    });
 }
 
-function get_full_url(url) {
-	return location.protocol + '//' + location.host + url;
-}
+function searchSeeds(fullUrl) {
+	console.log('Searching', fullUrl);
 
-function find_seeds(full_url) {
-	console.log('Searching', full_url);
+    setFileState(fullUrl, 'searching');
 
-	sha(full_url, function(url_hash){
-	    var magnet = get_magnet_uri(full_url, url_hash);
+	sha(fullUrl, function(urlHash){
+	    let magnet = getMagnetUri(fullUrl, urlHash);
 
 	    console.log('Searching', magnet);
 
-	    var torrent = client.add(magnet, onTorrentDownloading);
+	    let torrentD = client.add(magnet, null, onTorrentDownloading);
 
-		torrent.on('noPeers', function (announceType) {
-			console.log('no peers found', announceType);
+        torrentD.on('wire', function (wire) {
+            console.log('webtorrent', 'FS: Peer ('+wire.remoteAddress+') connected over '+wire.type+' (Connection ID: '+wire.peerId.substr(0,10)+').');
+        });
 
-			const parsed = queryString.parse(location.search);
+        torrentD.on('noPeers', function (announceType) {
+            console.log('no peers found', announceType);
 
-			if (typeof parsed['seed'] != "undefined") {
-				torrent.destroy();
-				start_seeding(full_url);
-			}
+            const parsed = queryString.parse(location.search);
 
-		})
+            if ('seed' in parsed) {
+                torrentD.destroy();
+                startSeeding(fullUrl);
+            }
+
+        });
+
+        torrentD.on('done', function (info) {
+            console.log('webtorrent', 'FS: File received');
+
+            let file = getFile(torrentD);
+			file.getBuffer(function (err, buffer) {
+				// data = buffer;
+
+				// console.log(buffer);
+
+				torrentD.destroy();
+				seeding(buffer, fullUrl);
+			});
+        });
 	});
 }
 
-function seeding(data, full_url) {
-	sha(full_url, function(url_hash){
-		sha(data, function (page_hash) {
-		    // var payload = { date: new Date(), page: data, page_hash: page_hash, url: full_url }
-		    // var payload = data;
-		    // var buffer_payload = Buffer.from(JSON.stringify(payload), 'utf8')
+function seeding(data, fullUrl) {
+	sha(fullUrl, function(url_hash){
+		let buffer_payload = Buffer.from(data, 'binary');
 
-		    var buffer_payload = Buffer.from(data, 'binary')
-		    
-		    console.log('ready')
+		console.log('ready');
 
-		    var torrent = client.seed(buffer_payload, {forced_id: url_hash, announceList: announceList, name: full_url}, function(torrent){
-		        console.log('Sending', torrent.magnetURI)
+		client.seed(buffer_payload, {forced_id: url_hash, announceList: announceList, name: fullUrl}, function(torrentU) {
+			console.log('Sending', torrentU.magnetURI);
 
-				render_file(torrent);
+			renderFile(torrentU);
 
-		        seeding_list[full_url] = 'seeding';
+            setFileState(fullUrl, 'seeding');
 
-		        torrent.on('upload', function (bytes) {
-		          console.log('webtorrent', 'Sending this page to peer ('+bytes+' bytes)')
-		        })
-		        torrent.on('wire', function (wire) {
-		          console.log('webtorrent', 'Peer ('+wire.remoteAddress+') connected over '+wire.type+'.')
-		        })
-		    });
+			torrentU.on('upload', function (bytes) {
+			  console.log('webtorrent', 'Sending this page to peer ('+bytes+' bytes)');
+			});
+
+			torrentU.on('wire', function (wire) {
+			  console.log('webtorrent', 'Peer ('+wire.remoteAddress+') connected over '+wire.type+'.');
+			});
 		});
 	});
 }
 
-function start_seeding(full_url) {
-	if (typeof seeding_list[full_url] != "undefined") return 0;
+function startSeeding(fullUrl) {
+    if (getFileState(fullUrl) === 'seeding') return 0;
 
-	console.log('Sending', full_url);
+	console.log('Sending', fullUrl);
 
-	var oReq = new XMLHttpRequest();
-	oReq.open("GET", full_url, true);
+	let oReq = new XMLHttpRequest();
+	oReq.open("GET", fullUrl, true);
 	oReq.responseType = "arraybuffer";
 
 	oReq.onload = function(oEvent) {
-	  	var data = oReq.response;
-	 	seeding(data, full_url);
+	  	let data = oReq.response;
+	 	seeding(data, fullUrl);
 	};
 
 	oReq.send();
 }
 
-function search_webcdn_resources() {
+function searchWebcdnResources() {
 	// search for images
 	$('img[webcdn-src]').each(function (id, item) {
 		var src = $(item).attr('webcdn-src');
-		var full_url = get_full_url(src);
+		var fullUrl = getFullUrl(src);
 
-		sha(full_url, function(url_hash){
-			$(item).attr('hash', url_hash);
+		sha(fullUrl, function(urlHash){
+			$(item).attr('hash', urlHash);
 		});
 
-		find_seeds(full_url);
+		searchSeeds(fullUrl);
 	});
 }
 
 $(document).ready(function(){
-	search_webcdn_resources();
-	console.log('working');
+	searchWebcdnResources();
+
+    setInterval(function () {
+    	console.log(fileInfo);
+	}, 500);
 });
+
 },{"jquery":72,"query-string":113,"safe-buffer":153,"simple-sha1":157,"webtorrent":194}]},{},[206])(206)
 });
